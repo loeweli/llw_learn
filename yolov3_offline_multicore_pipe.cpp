@@ -275,13 +275,14 @@ DataProvider<datatype>::DataProvider(
   scale_ = scale;
 
   need_mean_ = true;
-  if (FLAGS_use_mean == "off") {
+  if (FLAGS_use_mean == "off") {   // use_mean = on
     need_mean_ = false;
   }
 }
 
 template<class datatype>
 void DataProvider<datatype>::PreData(int batch_size) {
+  cout << "arange——data——offset——anchor——";
   arange_data = reinterpret_cast<float*>(cpu_data_[1]);
   offset_data = reinterpret_cast<float*>(cpu_data_[2]);
   anchor_data0 = reinterpret_cast<float*>(cpu_data_[3]);
@@ -334,7 +335,7 @@ void DataProvider<datatype>::PreData(int batch_size) {
 template<class datatype>
 void DataProvider<datatype>::preRead() { // 读图片
   in_n_ = inferencer_->n();
-  cout << "int in_nnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnn-----------"  << in_n_ << endl;
+  cout << "读图片int in_nnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnn-----------"  << in_n_ << endl;
   std::string img_dir = FLAGS_img_dir;
   while (images_.size()) {
     vector<cv::Mat> imgs;
@@ -371,6 +372,7 @@ void DataProvider<datatype>::run() {
   CNRT_CHECK(cnrtSetCurrentDevice(dev));
 
   if (!use_rtctx && FLAGS_data_parallelism * FLAGS_model_parallelism <= 8) {
+    cout << "cnrtSetCurrentChannel" << endl;
     cnrtSetCurrentChannel((cnrtChannelType_t)(thread_id_ % CHANNEL_NUM));
   }
 
@@ -406,7 +408,7 @@ void DataProvider<datatype>::run() {
   lk.unlock();
 
   if (FLAGS_pre_read) {
-    cout << v_images.size() << endl;
+    cout << v_images.size() <<"vimages-------------------------- vector<vector<cv::Mat> >" << endl;
     for (int i = 0; i < v_images.size(); i++) {
       
       mof::Timer prepareInput;
@@ -433,7 +435,8 @@ void DataProvider<datatype>::run() {
       inferencer_->pushValidInputNames(img_names);
       lock.unlock();
     }
-  } else {
+  }
+   else {
     while (images_.size()) {
       mof::Timer prepareInput;
       vector<cv::Mat> imgs;
@@ -487,6 +490,7 @@ void DataProvider<datatype>::run() {
 
 template<class datatype>
 void DataProvider<datatype>::Preprocess(const std::vector<cv::Mat>& imgs) {
+  cout << "preprocess预处理---------------------------" << endl;
   /* Convert the input image to the input image format of the network. */
   datatype* input_data = reinterpret_cast<datatype*>(cpu_data_[0]);
   for (int i = 0; i < imgs.size(); ++i) {
@@ -551,7 +555,7 @@ void DataProvider<datatype>::SetMean(const string& mean_file,
                            const string& mean_value) {
   if (need_mean_ == false)
     return;
-
+  cout << "setmean-----------------------------"<< endl;
   if (!mean_file.empty()) {
     CHECK(mean_value.empty()) <<
       "Cannot specify mean_file and mean_value at the same time";
@@ -617,6 +621,7 @@ void DataProvider<datatype>::SetMean(const string& mean_file,
 
 template <class datatype>
 void DataProvider<datatype>::SetStdt(const string& stdt_value) {
+  cout << "setstdt------------------------------" << endl;
   if (!stdt_value.empty()) {
     /* The channel order of the stdt_value is RGB or grayscale.
      * We will turn the channel order to BGR since images with channel order
@@ -1295,15 +1300,18 @@ template<class datatype>
 void Pipeline<datatype>::run() {
   vector<thread*> threads(FLAGS_data_provider_num + FLAGS_post_processor_num + 1, nullptr);
   for (int i = 0; i < FLAGS_data_provider_num; i++) {
+    cout << "预处理线程------------------DataProvider" << ""<< endl;
     threads[i] = new thread(&DataProvider<datatype>::run, data_provider_[i]);
   }
   if (!use_rtctx) {
+    cout << "推理线程------------------inference" << ""<< endl;
     threads[FLAGS_data_provider_num] = new thread(&Inferencer::run, inferencer_);
   } else {
     LOG(INFO) << "use runtime context";
     threads[FLAGS_data_provider_num] = new thread(&Inferencer::run_with_rtctx, inferencer_);
   }
   for (int i = 0; i < FLAGS_post_processor_num; i++) {
+    cout << "后处理线程------------------PostProcessor" << ""<< endl;
     threads[FLAGS_data_provider_num + 1 + i] = new thread(&PostProcessor::run, post_processor_[i]);
   }
   for (auto th : threads)
@@ -1370,10 +1378,10 @@ void Process(vector<queue<string>> img_list) {
       count++;
     }
   }
-  cout << count << endl;
-  cout << img_list.size() << "--------------------------" << endl; 
-  cout << pipeline_instances.size() << "--------------------------" << endl; 
-  cout << pipelines.size() << "--------------------------" << endl; 
+  cout << count<<"count" << endl;
+  cout << img_list.size() << " img_list.size()--------------------------" << endl; 
+  cout << pipeline_instances.size() << "pipeline_instances.size()--------------------------" << endl; 
+  cout << pipelines.size() << "pipelines.size()--------------------------" << endl; 
 
   double time_use;
   struct timeval tpend, tpstart;
@@ -1497,15 +1505,19 @@ int main(int argc, char* argv[]) {
   //     return -1;
   // }
   // namedWindow("output", CV_WINDOW_AUTOSIZE);
-
+  // vector<cv::Mat> imgs;
   // while (capture.read(frame))
   // {
   //   if (FLAGS_int8) {
+
+  //   imgs.push_back(frame);
+  //   v_images.push_back(imgs);
   //   Process<uint8_t>(frame);
   //   } else {
   //   Process<float>(frame);
   //   }
-
+  //   imgs.clear();
+    
   //   waitKey(10);
   // }
 
