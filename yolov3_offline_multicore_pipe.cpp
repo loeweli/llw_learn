@@ -255,7 +255,7 @@ class DataProvider {
   cv::Size input_geometry_;
   int thread_id_;
   bool need_mean_;
-  vector<vector<cv::Mat> > v_images;
+  // vector<vector<cv::Mat> > v_images;
   vector<vector<string> > v_names;
   float* offset_data;
   float* arange_data;
@@ -263,7 +263,7 @@ class DataProvider {
   float* anchor_data1;
   float* anchor_data2;
 };
-
+vector<vector<cv::Mat> > v_images;
 template<class datatype>
 DataProvider<datatype>::DataProvider(
                const string& mean_file,
@@ -1056,7 +1056,7 @@ void PostProcessor::RectangleAndDrawResult(float* ids_data,
     std::stringstream s0;
     s0 << score_data[i];
     string s00 = s0.str();
-
+    cout << "结果：：：：：：：：：：：：：：" << id2name[index] << endl;
     cv::putText(*result_img, id2name[index],
         cv::Point(p1.x, (p1.y + p2.y)/2 - 10), 2, 0.5,
         cv::Scalar(255, 0, 0), 0, 8, 0);
@@ -1496,38 +1496,38 @@ int main(int argc, char* argv[]) {
 
   cnrtInit(0);
 
-  // VideoCapture capture;
-  // Mat frame;
-  // frame= capture.open("E:/image/a1.avi");
-  // if(!capture.isOpened())
-  // {
-  //     printf("can not open ...\n");
-  //     return -1;
-  // }
-  // namedWindow("output", CV_WINDOW_AUTOSIZE);
-  // vector<cv::Mat> imgs;
-  // while (capture.read(frame))
-  // {
-  //   if (FLAGS_int8) {
-
-  //   imgs.push_back(frame);
-  //   v_images.push_back(imgs);
-  //   Process<uint8_t>(frame);
-  //   } else {
-  //   Process<float>(frame);
-  //   }
-  //   imgs.clear();
-    
-  //   waitKey(10);
-  // }
-
-  for (int i = 0; i < FLAGS_iter_num; ++i) {
-    if (FLAGS_int8) {
-      Process<uint8_t>(img_list);
-    } else {
-      Process<float>(img_list);
-    }
+  VideoCapture capture;
+  Mat frame;
+  frame= capture.open("/home/Cambricon-Test/nanbei.mp4");
+  if(!capture.isOpened())
+  {
+      printf("can not open ...\n");
+      return -1;
   }
+  // namedWindow("output", CV_WINDOW_AUTOSIZE);
+  vector<cv::Mat> imgs;
+  while (capture.read(frame))
+  {
+    if (FLAGS_int8) {
+
+    imgs.push_back(frame);
+    v_images.push_back(imgs);
+    Process<uint8_t>(img_list);
+    } else {
+    Process<float>(img_list);
+    }
+    imgs.clear();
+    v_images.clear();
+    waitKey(10);
+  }
+
+  // for (int i = 0; i < FLAGS_iter_num; ++i) {
+  //   if (FLAGS_int8) {
+  //     Process<uint8_t>(img_list);
+  //   } else {
+  //     Process<float>(img_list);
+  //   }
+  // }
   cnrtDestroy();
 }
 #endif
