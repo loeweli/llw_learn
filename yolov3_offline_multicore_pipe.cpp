@@ -56,7 +56,7 @@ bool use_rtctx = false;
 int height = 416;
 int width = 416;
 int result_num = 0;
-
+Mat frame;
 #ifdef USE_OPENCV
 
 static constexpr int kSplicePerThreadUnion2 = 8;
@@ -256,7 +256,7 @@ class DataProvider {
   int thread_id_;
   bool need_mean_;
   // vector<vector<cv::Mat> > v_images;
-  vector<vector<string> > v_names;
+  // vector<vector<string> > v_names;
   float* offset_data;
   float* arange_data;
   float* anchor_data0;
@@ -264,6 +264,8 @@ class DataProvider {
   float* anchor_data2;
 };
 vector<vector<cv::Mat> > v_images;
+  vector<vector<string> > v_names;
+
 template<class datatype>
 DataProvider<datatype>::DataProvider(
                const string& mean_file,
@@ -282,7 +284,7 @@ DataProvider<datatype>::DataProvider(
 
 template<class datatype>
 void DataProvider<datatype>::PreData(int batch_size) {
-  cout << "arange——data——offset——anchor——";
+  cout << "arange——data——offset——anchor——" << endl;
   arange_data = reinterpret_cast<float*>(cpu_data_[1]);
   offset_data = reinterpret_cast<float*>(cpu_data_[2]);
   anchor_data0 = reinterpret_cast<float*>(cpu_data_[3]);
@@ -381,7 +383,7 @@ void DataProvider<datatype>::run() {
   in_c_ = inferencer_->c();
   in_h_ = inferencer_->h();
   in_w_ = inferencer_->w();
-  cout << in_n_<< "-----"<< in_c_<< "-----"<< in_h_<< "-----"<< in_w_<< "-----"<<endl;
+  cout << in_n_<< "-----"<< in_c_<< "-----"<< in_h_<< "-----"<< in_w_<< "-----"<< endl;
   cpu_data_[0] = reinterpret_cast<void*>
                  (malloc(in_n_ * in_c_ * in_h_ * in_w_ * sizeof(float)));
   for (int i = 0; i < 3; i++) {
@@ -413,8 +415,10 @@ void DataProvider<datatype>::run() {
       
       mof::Timer prepareInput;
       vector<cv::Mat> imgs = v_images[i];
+      cout << "图片像素：" <<imgs[0].cols << "  " << imgs[0].rows << endl;
       cout << imgs.size() <<"放图片的imgs---------------------------"<<endl;
       vector<string> img_names = v_names[i];
+      cout << img_names.size() <<"放图片的名字的容器长度---------------------------"<<endl;
       Preprocess(imgs);
       prepareInput.duration("prepare input data ...");
 
@@ -435,6 +439,7 @@ void DataProvider<datatype>::run() {
       inferencer_->pushValidInputNames(img_names);
       lock.unlock();
     }
+    cout << "pre_read结束" << endl;
   }
    else {
     while (images_.size()) {
@@ -486,6 +491,7 @@ void DataProvider<datatype>::run() {
     free(cpu_data_[i]);
   }
   free(cpu_data_);
+  cout << "DataProvider结束" << endl;
 }
 
 template<class datatype>
@@ -722,8 +728,11 @@ Inferencer::Inferencer(
   cnrtExtractFunction(&function, model_, name.c_str());
   // 3. get function's I/O DataDesc
   cnrtGetInputDataDesc(&inputDescS_, &inputNum , function);
+  cout << "cnrtGetInputDataDesc" << inputNum << endl;
   CHECK_EQ(inputNum, 10);
   cnrtGetOutputDataDesc(&outputDescS_, &outputNum, function);
+  cout << "cnrtGetOutputDataDesc" << outputNum<< endl;
+
   CHECK_EQ(outputNum, 54);
   // 4. allocate I/O data space on CPU memory and prepare Input data
   int in_count;
@@ -863,7 +872,7 @@ void Inferencer::run() {
   cnrtDev_t dev;
   CNRT_CHECK(cnrtGetDeviceHandle(&dev, FLAGS_device_id));
   CNRT_CHECK(cnrtSetCurrentDevice(dev));
-
+  cout << "推理开始" << endl;
   // func_type_ = CNRT_FUNC_TYPE_BLOCK;
   if (FLAGS_data_parallelism * FLAGS_model_parallelism <= 8) {
     cnrtSetCurrentChannel((cnrtChannelType_t)(thread_id_ % CHANNEL_NUM));
@@ -927,10 +936,12 @@ void Inferencer::run() {
   cnrtDestroyNotifier(&notifier_start);
   cnrtDestroyNotifier(&notifier_end);
   cnrtDestroyFunction(function_);
+  cout << "inference结束" << endl;
+
 }
 
 void Inferencer::run_with_rtctx() {
-  LOG(INFO) << "use run_with_rtctx FLAGS_duplicate_channel is " << FLAGS_duplicate_channel;
+  LOG(INFO) << "use run_with_rtctx FLAGS_duplicate_channel is 开始" << FLAGS_duplicate_channel;
   cnrtDev_t dev;
   CNRT_CHECK(cnrtGetDeviceHandle(&dev, 0));
   CNRT_CHECK(cnrtSetCurrentDevice(dev));
@@ -1030,7 +1041,9 @@ void PostProcessor::RectangleAndDrawResult(float* ids_data,
                                            int idx) {
   cv::Mat *result_img;
   std::string img_dir = FLAGS_img_dir + intorigin_img;
-  cv::Mat img = cv::imread(img_dir, -1);
+  // cv::Mat img = cv::imread(img_dir, -1);
+  cv::Mat img = frame;
+
   result_img = &img;
   string id2name[20] = {
           "aeroplane", "bicycle", "bird", "boat",
@@ -1067,8 +1080,11 @@ void PostProcessor::RectangleAndDrawResult(float* ids_data,
 
   string img_name;
   std::stringstream ss;
-  ss << "./yolov3/detect_" << intorigin_img;
+  ss << "./yolov3/detect_" << intorigin_img << ".jpg";
   ss >> img_name;
+  cout << "保存图片时候的名字：" << img_name <<endl;
+  cout << "保存图片时候的图片：" << result_img->size() <<endl;
+  // cv::imshow("result",*result_img);
   cv::imwrite(img_name, *result_img);
 
   total_++;
@@ -1136,6 +1152,7 @@ void PostProcessor::run() {
     // use mutex to ensure result is match for origin_img
     std::unique_lock<std::mutex> lock(inferencer_->post_mtx);
     void** mlu_output_data = inferencer_->validOutputFifo_.pop();
+    cout << "postprocessor:while开始"<< mlu_output_data << endl;
     if (mlu_output_data) {
       // get img names matching the results
       vector<string> origin_img = inferencer_->popValidInputNames();
@@ -1263,11 +1280,12 @@ Pipeline<datatype>::Pipeline(const string& mean_file,
     cout << "images[[[[[[[[[[[]]]]]]]]]]]]]]]]]]=++++++++++++++++++++" << typeid(images[thread_id * FLAGS_data_provider_num + i]).name() << endl;
     data_provider_[i]->inferencer_ = inferencer_;
     data_provider_[i]->thread_id_ = thread_id;
-    if (FLAGS_pre_read) {
-      data_provider_[i]->preRead(); //读图片
-    }
+    // if (FLAGS_pre_read) {
+    //   data_provider_[i]->preRead(); //读图片
+    // }
   }
   for (int i = 0; i < FLAGS_post_processor_num; i++) {
+    cout << "post_processor_-inferencer_----------" << endl;
     post_processor_[i] = new PostProcessor();
     post_processor_[i]->inferencer_ = inferencer_;
     post_processor_[i]->thread_id_ = thread_id;
@@ -1315,6 +1333,7 @@ void Pipeline<datatype>::run() {
     threads[FLAGS_data_provider_num + 1 + i] = new thread(&PostProcessor::run, post_processor_[i]);
   }
   for (auto th : threads)
+    // cout << "th.join-----1319" << endl;
     th->join();
   for (auto &th : threads) {
     if (th != nullptr) {
@@ -1497,7 +1516,7 @@ int main(int argc, char* argv[]) {
   cnrtInit(0);
 
   VideoCapture capture;
-  Mat frame;
+  
   frame= capture.open("/home/Cambricon-Test/nanbei.mp4");
   if(!capture.isOpened())
   {
@@ -1506,18 +1525,29 @@ int main(int argc, char* argv[]) {
   }
   // namedWindow("output", CV_WINDOW_AUTOSIZE);
   vector<cv::Mat> imgs;
+  vector<string> img_names;
+  int filename_count = 0;
   while (capture.read(frame))
   {
+    // resize(frame,frame,Size(800,1000));
+    img_names.push_back(to_string(filename_count));
+    v_names.push_back(img_names);
+    filename_count++;
     if (FLAGS_int8) {
-
-    imgs.push_back(frame);
-    v_images.push_back(imgs);
-    Process<uint8_t>(img_list);
+      
+      imgs.push_back(frame);
+      v_images.push_back(imgs);
+      Process<uint8_t>(img_list);
     } else {
-    Process<float>(img_list);
+      imgs.push_back(frame);
+      v_images.push_back(imgs);
+      Process<float>(img_list);
+    
     }
     imgs.clear();
     v_images.clear();
+    img_names.clear();
+    v_names.clear();
     waitKey(10);
   }
 
