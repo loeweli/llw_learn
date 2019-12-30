@@ -193,8 +193,12 @@ class Inferencer {
   cnrtModel_t model_;
   cnrtFunction_t function;
   unsigned int in_n_, in_c_, in_h_, in_w_;
-  unsigned int out_n_[54], out_c_[54], out_h_[54], out_w_[54];
-  int out_count_[54];
+  // unsigned int out_n_[54], out_c_[54], out_h_[54], out_w_[54];
+  unsigned int out_n_[3], out_c_[3], out_h_[3], out_w_[3];
+
+  // int out_count_[54];
+  int out_count_[3];
+
   cnrtDim3_t dim_;
   int running_;
   int thread_id_;
@@ -732,8 +736,7 @@ Inferencer::Inferencer(
   CHECK_EQ(inputNum, 10);
   cnrtGetOutputDataDesc(&outputDescS_, &outputNum, function);
   cout << "cnrtGetOutputDataDesc" << outputNum<< endl;
-
-  CHECK_EQ(outputNum, 54);
+  CHECK_EQ(outputNum, 3);
   // 4. allocate I/O data space on CPU memory and prepare Input data
   int in_count;
 
@@ -1172,37 +1175,61 @@ void PostProcessor::run() {
 
       inferencer_->pushFreeOutputData(mlu_output_data);
 
-      float* ids_result = reinterpret_cast<float*>(outputCpuPtrS[51]);
-      float* score_result = reinterpret_cast<float*>(outputCpuPtrS[52]);
-      float* bbox_result = reinterpret_cast<float*>(outputCpuPtrS[53]);
+      // float* ids_result = reinterpret_cast<float*>(outputCpuPtrS[51]);
+      // float* score_result = reinterpret_cast<float*>(outputCpuPtrS[52]);
+      // float* bbox_result = reinterpret_cast<float*>(outputCpuPtrS[53]);
 
+      float* ids_result = reinterpret_cast<float*>(outputCpuPtrS[0]);
+      float* score_result = reinterpret_cast<float*>(outputCpuPtrS[1]);
+      float* bbox_result = reinterpret_cast<float*>(outputCpuPtrS[2]);
       unsigned int output_chw[3];
-      for (unsigned int i = 51; i < 54; i++) {
-        output_chw[i-51] = inferencer_->output_chw(i);
-      }
+      // for (unsigned int i = 51; i < 54; i++) {
+      //   output_chw[i-51] = inferencer_->output_chw(i);
+      // }
+      for (unsigned int i = 0; i < 3; i++) { 
+        output_chw[i] = inferencer_->output_chw(i);
+      }//change
 
-      // LOG(INFO) << "output_nchw[0] = " << output_chw[0];
-      // LOG(INFO) << "output_nchw[1] = " << output_chw[1];
-      // LOG(INFO) << "output_nchw[2] = " << output_chw[2];
-      // std::cout << "output_chw = " << output_chw << std::endl;
+      LOG(INFO) << "output_nchw[0] = " << output_chw[0];
+      LOG(INFO) << "output_nchw[1] = " << output_chw[1];
+      LOG(INFO) << "output_nchw[2] = " << output_chw[2];
+      std::cout << "output_chw = " << output_chw << std::endl;
       unsigned int addr_offset = 0;
 
-      auto ids_n_ = inferencer_->out_n(51);
-      auto ids_c_ = inferencer_->out_c(51);
-      auto ids_h_ = inferencer_->out_h(51);
-      auto ids_w_ = inferencer_->out_w(51);
-      // auto ids_size = ids_n_ * ids_c_ * ids_h_ * ids_w_;
+      // auto ids_n_ = inferencer_->out_n(51);
+      // auto ids_c_ = inferencer_->out_c(51);
+      // auto ids_h_ = inferencer_->out_h(51);
+      // auto ids_w_ = inferencer_->out_w(51);
+      // // auto ids_size = ids_n_ * ids_c_ * ids_h_ * ids_w_;
 
-      auto score_n_ = inferencer_->out_n(52);
-      auto score_c_ = inferencer_->out_c(52);
-      auto score_h_ = inferencer_->out_h(52);
-      auto score_w_ = inferencer_->out_w(52);
+      // auto score_n_ = inferencer_->out_n(52);
+      // auto score_c_ = inferencer_->out_c(52);
+      // auto score_h_ = inferencer_->out_h(52);
+      // auto score_w_ = inferencer_->out_w(52);
+      // // auto score_size = score_n_ * score_c_ * score_h_ * score_w_;
+
+      // auto bbox_n_ = inferencer_->out_n(53);
+      // auto bbox_c_ = inferencer_->out_c(53);
+      // auto bbox_h_ = inferencer_->out_h(53);
+      // auto bbox_w_ = inferencer_->out_w(53);
+
+      auto rois_n_ = inferencer_->out_n(0);
+      auto rois_c_ = inferencer_->out_c(0);
+      auto rois_h_ = inferencer_->out_h(0);
+      auto rois_w_ = inferencer_->out_w(0);//change
+      // auto rois_size = rois_n_ * rois_c_ * rois_h_ * rois_w_;
+
+      auto score_n_ = inferencer_->out_n(1);
+      auto score_c_ = inferencer_->out_c(1);
+      auto score_h_ = inferencer_->out_h(1);
+      auto score_w_ = inferencer_->out_w(1);
       // auto score_size = score_n_ * score_c_ * score_h_ * score_w_;
 
-      auto bbox_n_ = inferencer_->out_n(53);
-      auto bbox_c_ = inferencer_->out_c(53);
-      auto bbox_h_ = inferencer_->out_h(53);
-      auto bbox_w_ = inferencer_->out_w(53);
+      auto bbox_n_ = inferencer_->out_n(2);
+      auto bbox_c_ = inferencer_->out_c(2);
+      auto bbox_h_ = inferencer_->out_h(2);
+      auto bbox_w_ = inferencer_->out_w(2);
+      // auto bbox_size = bbox_n_ * bbox_c_ * bbox_h_ * bbox_w_;
 
       float conf_thresh = 0.0;
 
