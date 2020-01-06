@@ -31,11 +31,13 @@
 #include <vector>
 #include <cmath>
 #include <atomic>
+#include <time.h>
 
 #include "../include/detection_out.hpp"
 #include "../include/runtime.hpp"
 #include "../include/blocking_queue.hpp"
 #include "../include/func_runner.hpp"
+
 
 using std::map;
 using std::max;
@@ -57,6 +59,7 @@ int height = 416;
 int width = 416;
 int result_num = 0;
 Mat frame;
+Mat dst;
 #ifdef USE_OPENCV
 
 static constexpr int kSplicePerThreadUnion2 = 8;
@@ -86,12 +89,12 @@ typedef struct {
 } detection_bbox;
 
 
-const char *obj_sparse_tag[20]={"aeroplane", "bicycle", "bird", "boat",
-           "bottle", "bus", "car", "cat", "chair",
-           "cow", "diningtable", "dog", "horse",
-           "motorbike", "person", "pottedplant",
-           "sheep", "sofa", "train", "tvmonitor"};
-
+// const char *obj_sparse_tag[20]={"aeroplane", "bicycle", "bird", "boat",
+//            "bottle", "bus", "car", "cat", "chair",
+//            "cow", "diningtable", "dog", "horse",
+//            "motorbike", "person", "pottedplant",
+//            "sheep", "sofa", "train", "tvmonitor"};
+const char *obj_sparse_tag[20]={"hat", "person"};
 
 std::ostream& operator<<(std::ostream& os, const mof::MShape& mshape) {
   os << " nchw = [(" << mshape.n << ", " << mshape.c << ", "
@@ -268,7 +271,7 @@ class DataProvider {
   float* anchor_data2;
 };
 vector<vector<cv::Mat> > v_images;
-  vector<vector<string> > v_names;
+vector<vector<string> > v_names;
 
 template<class datatype>
 DataProvider<datatype>::DataProvider(
@@ -288,7 +291,7 @@ DataProvider<datatype>::DataProvider(
 
 template<class datatype>
 void DataProvider<datatype>::PreData(int batch_size) {
-  cout << "arange——data——offset——anchor——" << endl;
+  // cout << "arange——data——offset——anchor——" << endl;
   arange_data = reinterpret_cast<float*>(cpu_data_[1]);
   offset_data = reinterpret_cast<float*>(cpu_data_[2]);
   anchor_data0 = reinterpret_cast<float*>(cpu_data_[3]);
@@ -341,13 +344,13 @@ void DataProvider<datatype>::PreData(int batch_size) {
 template<class datatype>
 void DataProvider<datatype>::preRead() { // 读图片
   in_n_ = inferencer_->n();
-  cout << "读图片int in_nnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnn-----------"  << in_n_ << endl;
+  // cout << "读图片int in_nnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnn-----------"  << in_n_ << endl;
   std::string img_dir = FLAGS_img_dir;
   while (images_.size()) {
     vector<cv::Mat> imgs;
     vector<string> img_names;
     int left_num = images_.size();
-    cout << left_num << "------------------------left_num--------------" << endl;
+    // cout << left_num << "------------------------left_num--------------" << endl;
     for (int i = 0; i < in_n_; i++) {
       if (i < left_num) {
         string file = images_.front();
@@ -387,7 +390,7 @@ void DataProvider<datatype>::run() {
   in_c_ = inferencer_->c();
   in_h_ = inferencer_->h();
   in_w_ = inferencer_->w();
-  cout << in_n_<< "-----"<< in_c_<< "-----"<< in_h_<< "-----"<< in_w_<< "-----"<< endl;
+  // cout << in_n_<< "-----"<< in_c_<< "-----"<< in_h_<< "-----"<< in_w_<< "-----"<< endl;
   cpu_data_[0] = reinterpret_cast<void*>
                  (malloc(in_n_ * in_c_ * in_h_ * in_w_ * sizeof(float)));
   for (int i = 0; i < 3; i++) {
@@ -414,15 +417,15 @@ void DataProvider<datatype>::run() {
   lk.unlock();
 
   if (FLAGS_pre_read) {
-    cout << v_images.size() <<"vimages-------------------------- vector<vector<cv::Mat> >" << endl;
+    // cout << v_images.size() <<"vimages-------------------------- vector<vector<cv::Mat> >" << endl;
     for (int i = 0; i < v_images.size(); i++) {
       
       mof::Timer prepareInput;
       vector<cv::Mat> imgs = v_images[i];
-      cout << "图片像素：" <<imgs[0].cols << "  " << imgs[0].rows << endl;
-      cout << imgs.size() <<"放图片的imgs---------------------------"<<endl;
+      // cout << "图片像素：" <<imgs[0].cols << "  " << imgs[0].rows << endl;
+      // cout << imgs.size() <<"放图片的imgs---------------------------"<<endl;
       vector<string> img_names = v_names[i];
-      cout << img_names.size() <<"放图片的名字的容器长度---------------------------"<<endl;
+      // cout << img_names.size() <<"放图片的名字的容器长度---------------------------"<<endl;
       Preprocess(imgs);
       prepareInput.duration("prepare input data ...");
 
@@ -443,7 +446,7 @@ void DataProvider<datatype>::run() {
       inferencer_->pushValidInputNames(img_names);
       lock.unlock();
     }
-    cout << "pre_read结束" << endl;
+    // cout << "pre_read结束" << endl;
   }
    else {
     while (images_.size()) {
@@ -500,7 +503,7 @@ void DataProvider<datatype>::run() {
 
 template<class datatype>
 void DataProvider<datatype>::Preprocess(const std::vector<cv::Mat>& imgs) {
-  cout << "preprocess预处理---------------------------" << endl;
+  // cout << "preprocess预处理---------------------------" << endl;
   /* Convert the input image to the input image format of the network. */
   datatype* input_data = reinterpret_cast<datatype*>(cpu_data_[0]);
   for (int i = 0; i < imgs.size(); ++i) {
@@ -565,7 +568,7 @@ void DataProvider<datatype>::SetMean(const string& mean_file,
                            const string& mean_value) {
   if (need_mean_ == false)
     return;
-  cout << "setmean-----------------------------"<< endl;
+  // cout << "setmean-----------------------------"<< endl;
   if (!mean_file.empty()) {
     CHECK(mean_value.empty()) <<
       "Cannot specify mean_file and mean_value at the same time";
@@ -732,10 +735,10 @@ Inferencer::Inferencer(
   cnrtExtractFunction(&function, model_, name.c_str());
   // 3. get function's I/O DataDesc
   cnrtGetInputDataDesc(&inputDescS_, &inputNum , function);
-  cout << "cnrtGetInputDataDesc" << inputNum << endl;
+  // cout << "cnrtGetInputDataDesc" << inputNum << endl;
   CHECK_EQ(inputNum, 10);
   cnrtGetOutputDataDesc(&outputDescS_, &outputNum, function);
-  cout << "cnrtGetOutputDataDesc" << outputNum<< endl;
+  // cout << "cnrtGetOutputDataDesc" << outputNum<< endl;
   CHECK_EQ(outputNum, 3);
   // 4. allocate I/O data space on CPU memory and prepare Input data
   int in_count;
@@ -875,7 +878,7 @@ void Inferencer::run() {
   cnrtDev_t dev;
   CNRT_CHECK(cnrtGetDeviceHandle(&dev, FLAGS_device_id));
   CNRT_CHECK(cnrtSetCurrentDevice(dev));
-  cout << "推理开始" << endl;
+  // cout << "推理开始" << endl;
   // func_type_ = CNRT_FUNC_TYPE_BLOCK;
   if (FLAGS_data_parallelism * FLAGS_model_parallelism <= 8) {
     cnrtSetCurrentChannel((cnrtChannelType_t)(thread_id_ % CHANNEL_NUM));
@@ -939,12 +942,12 @@ void Inferencer::run() {
   cnrtDestroyNotifier(&notifier_start);
   cnrtDestroyNotifier(&notifier_end);
   cnrtDestroyFunction(function_);
-  cout << "inference结束" << endl;
+  // cout << "inference结束" << endl;
 
 }
 
 void Inferencer::run_with_rtctx() {
-  LOG(INFO) << "use run_with_rtctx FLAGS_duplicate_channel is 开始" << FLAGS_duplicate_channel;
+  LOG(INFO) << "use run_with_rtctx FLAGS_duplicate_channel is " << FLAGS_duplicate_channel;
   cnrtDev_t dev;
   CNRT_CHECK(cnrtGetDeviceHandle(&dev, 0));
   CNRT_CHECK(cnrtSetCurrentDevice(dev));
@@ -1035,7 +1038,12 @@ PostProcessor::PostProcessor() {
   thread_id_ = 0;
   total_ = 0;
 }
-
+Mat writer_img; // 要写入的图像
+// 人头中心点及检测框内要确定的RGB线
+int height_part = 0;
+int person_cencol,person_cenrow;
+int box_top,box_bottom;
+uchar *rgbline = 0;
 void PostProcessor::RectangleAndDrawResult(float* ids_data,
                                            float* bbox_data,
                                            float* score_data,
@@ -1043,18 +1051,21 @@ void PostProcessor::RectangleAndDrawResult(float* ids_data,
                                            string intorigin_img,
                                            int idx) {
   cv::Mat *result_img;
-  std::string img_dir = FLAGS_img_dir + intorigin_img;
+  // std::string img_dir = FLAGS_img_dir + intorigin_img;
   // cv::Mat img = cv::imread(img_dir, -1);
   cv::Mat img = frame;
 
   result_img = &img;
-  string id2name[20] = {
-          "aeroplane", "bicycle", "bird", "boat",
-          "bottle", "bus", "car", "cat", "chair",
-          "cow", "diningtable", "dog", "horse",
-          "motorbike", "person", "pottedplant",
-          "sheep", "sofa", "train", "tvmonitor"};
-
+  dst = frame.clone();
+  
+  // string id2name[20] = {
+  //         "aeroplane", "bicycle", "bird", "boat",
+  //         "bottle", "bus", "car", "cat", "chair",
+  //         "cow", "diningtable", "dog", "horse",
+  //         "motorbike", "person", "pottedplant",
+  //         "sheep", "sofa", "train", "tvmonitor"};
+  string id2name[2] = {
+        "hat", "person"};
   detection_bbox *boxs = reinterpret_cast<detection_bbox*>(bbox_data);
   int index;
 
@@ -1068,29 +1079,82 @@ void PostProcessor::RectangleAndDrawResult(float* ids_data,
     p1.y = boxs[i].y_min * img.rows / (height * 1.0);
     p2.x = boxs[i].x_max * img.cols / (width * 1.0);
     p2.y = boxs[i].y_max * img.rows / (height * 1.0);
-    cv::rectangle(*result_img, p1, p2, cv::Scalar(0, 255, 0), 8, 8, 0);
+    // cv::rectangle(*result_img, p1, p2, cv::Scalar(0, 200, 0), 8, 8, 0);
+    cv::rectangle(dst, p1, p2, cv::Scalar(0, 200, 0), 8, 8, 0);
+
+    writer_img = *result_img;
+
+    imshow("dst",dst);
+
+    //绘制人头中心点
+    height_part = (int)(p2.y - p1.y) / 3;
+    person_cencol = (int)(p1.y + p2.y) / 2;
+    person_cenrow = (int)(p1.x + p2.x) / 2;
+
+    box_top = p1.y;
+    box_bottom = p2.y;
+    // for (int n = p1.x;n < p2.x;n++){
+    //   for (int m = box_top;m < box_bottom;m++){
+    //     rgbline = img.ptr<uchar>(m);
+    //     if(m < box_top + height_part){
+    //       rgbline[3 * n + 0] = 255;
+    //       rgbline[3 * n + 1] = 0;
+    //       rgbline[3 * n + 2] = 0;
+    //     }else if(m >= box_top + height_part && m < box_top + 2 * height_part){
+    //       rgbline[3 * person_cenrow + 0] = 0;
+    //       rgbline[3 * person_cenrow + 1] = 255;
+    //       rgbline[3 * person_cenrow + 2] = 0;
+    //     }else if(m <= box_top + 3 * height_part){
+    //       rgbline[3 * n + 0] = 0;
+    //       rgbline[3 * n + 1] = 0;
+    //       rgbline[3 * n + 2] = 255;
+    //     }
+    //   } 
+    // }
+
+    for (int n = p1.x;n < p2.x;n++){
+      for (int m = box_top;m < box_bottom;m++){
+        // rgbline = img.ptr<uchar>(m);
+        if(m < box_top + height_part){
+          img.at<uchar>(m,3 * n + 0) = 255;
+          img.at<uchar>(m,3 * n + 1) = 0;
+          img.at<uchar>(m,3 * n + 2) = 0;
+        }else if(m >= box_top + height_part && m < box_top + 2 * height_part){
+          img.at<uchar>(m,3 * person_cenrow + 0) = 0;
+          img.at<uchar>(m,3 * person_cenrow + 1) = 255;
+          img.at<uchar>(m,3 * person_cenrow + 2) = 0;
+        }else if(m <= box_top + 3 * height_part){
+          img.at<uchar>(m,3 * n + 0) = 0;
+          img.at<uchar>(m,3 * n + 1) = 0;
+          img.at<uchar>(m,3 * n + 2) = 255;
+        }
+      } 
+    }
+
+
     std::stringstream s0;
     s0 << score_data[i];
     string s00 = s0.str();
-    cout << "结果：：：：：：：：：：：：：：" << id2name[index] << endl;
-    cv::putText(*result_img, id2name[index],
-        cv::Point(p1.x, (p1.y + p2.y)/2 - 10), 2, 0.5,
-        cv::Scalar(255, 0, 0), 0, 8, 0);
-    cv::putText(*result_img, s00.c_str(),
-        cv::Point(p1.x, (p1.y + p2.y)/2 + 10), 2, 0.5,
-        cv::Scalar(255, 0, 0), 0, 8, 0);
+    // cout << "结果：：：：：：：：：：：：：：" << id2name[index] << endl;
+    // cv::putText(*result_img, id2name[index],
+    //     cv::Point(p1.x, (p1.y + p2.y)/2 - 10), 2, 0.5,
+    //     cv::Scalar(255, 0, 0), 0, 8, 0);
+    // cv::putText(*result_img, s00.c_str(),
+    //     cv::Point(p1.x, (p1.y + p2.y)/2 + 10), 2, 0.5,
+    //     cv::Scalar(255, 0, 0), 0, 8, 0);
   }
 
   string img_name;
   std::stringstream ss;
-  ss << "./yolov3/detect_" << intorigin_img << ".jpg";
+  // ss << "./yolov3/detect_" << intorigin_img << ".jpg";
   ss >> img_name;
-  cout << "保存图片时候的名字：" << img_name <<endl;
-  cout << "保存图片时候的图片：" << result_img->size() <<endl;
+  // cout << "保存图片时候的名字：" << img_name <<endl;
+  // cout << "保存图片时候的图片：" << result_img->size() <<endl;
+  writer_img =  *result_img;
   // cv::imshow("result",*result_img);
-  cv::imwrite(img_name, *result_img);
 
   total_++;
+  cout << total_ << "总数+++++++++++++++++++++++++++++" << endl;
 }
 
 void PostProcessor::RectangleAndPrintResult(float* ids_data,
@@ -1101,12 +1165,14 @@ void PostProcessor::RectangleAndPrintResult(float* ids_data,
                                             int idx) {
   detection_bbox *boxs = reinterpret_cast<detection_bbox*>(bbox_data);
   int index;
-  string id2name[20] = {
-          "aeroplane", "bicycle", "bird", "boat",
-          "bottle", "bus", "car", "cat", "chair",
-          "cow", "diningtable", "dog", "horse",
-          "motorbike", "person", "pottedplant",
-          "sheep", "sofa", "train", "tvmonitor"};
+  // string id2name[20] = {
+  //         "aeroplane", "bicycle", "bird", "boat",
+  //         "bottle", "bus", "car", "cat", "chair",
+  //         "cow", "diningtable", "dog", "horse",
+  //         "motorbike", "person", "pottedplant",
+  //         "sheep", "sofa", "train", "tvmonitor"};
+  string id2name[2] = {
+        "hat", "person"};
 
   for (int i = 0; i < 100; i++) {
     boxs[i].x_max /= (width * 1.0);
@@ -1155,7 +1221,7 @@ void PostProcessor::run() {
     // use mutex to ensure result is match for origin_img
     std::unique_lock<std::mutex> lock(inferencer_->post_mtx);
     void** mlu_output_data = inferencer_->validOutputFifo_.pop();
-    cout << "postprocessor:while开始"<< mlu_output_data << endl;
+    // cout << "postprocessor:while开始"<< mlu_output_data << endl;
     if (mlu_output_data) {
       // get img names matching the results
       vector<string> origin_img = inferencer_->popValidInputNames();
@@ -1190,10 +1256,10 @@ void PostProcessor::run() {
         output_chw[i] = inferencer_->output_chw(i);
       }//change
 
-      LOG(INFO) << "output_nchw[0] = " << output_chw[0];
-      LOG(INFO) << "output_nchw[1] = " << output_chw[1];
-      LOG(INFO) << "output_nchw[2] = " << output_chw[2];
-      std::cout << "output_chw = " << output_chw << std::endl;
+      // LOG(INFO) << "output_nchw[0] = " << output_chw[0];
+      // LOG(INFO) << "output_nchw[1] = " << output_chw[1];
+      // LOG(INFO) << "output_nchw[2] = " << output_chw[2];
+      // std::cout << "output_chw = " << output_chw << std::endl;
       unsigned int addr_offset = 0;
 
       // auto ids_n_ = inferencer_->out_n(51);
@@ -1236,12 +1302,12 @@ void PostProcessor::run() {
       float *ids_data = ids_result;
       float *bbox_data = bbox_result;
       float *score_data = score_result;
-
+      cout << "inference_->n:::::::::::::::" << inferencer_->n() << endl;
       for (unsigned int i = 0; i < inferencer_->n(); i++) {
         if (origin_img[i] != "null") {
           int idx = i;
           if (FLAGS_output_mode == "picture") {
-            conf_thresh = 0.5;
+            conf_thresh = 0.3;
             RectangleAndDrawResult(ids_data, bbox_data, score_data, conf_thresh,
                                   origin_img[i], idx);
           } else {
@@ -1304,7 +1370,7 @@ Pipeline<datatype>::Pipeline(const string& mean_file,
         mean_value,
         images[thread_id * FLAGS_data_provider_num + i],
         scale);
-    cout << "images[[[[[[[[[[[]]]]]]]]]]]]]]]]]]=++++++++++++++++++++" << typeid(images[thread_id * FLAGS_data_provider_num + i]).name() << endl;
+    // cout << "images[[[[[[[[[[[]]]]]]]]]]]]]]]]]]=++++++++++++++++++++" << typeid(images[thread_id * FLAGS_data_provider_num + i]).name() << endl;
     data_provider_[i]->inferencer_ = inferencer_;
     data_provider_[i]->thread_id_ = thread_id;
     // if (FLAGS_pre_read) {
@@ -1312,7 +1378,7 @@ Pipeline<datatype>::Pipeline(const string& mean_file,
     // }
   }
   for (int i = 0; i < FLAGS_post_processor_num; i++) {
-    cout << "post_processor_-inferencer_----------" << endl;
+    // cout << "post_processor_-inferencer_----------" << endl;
     post_processor_[i] = new PostProcessor();
     post_processor_[i]->inferencer_ = inferencer_;
     post_processor_[i]->thread_id_ = thread_id;
@@ -1345,18 +1411,18 @@ template<class datatype>
 void Pipeline<datatype>::run() {
   vector<thread*> threads(FLAGS_data_provider_num + FLAGS_post_processor_num + 1, nullptr);
   for (int i = 0; i < FLAGS_data_provider_num; i++) {
-    cout << "预处理线程------------------DataProvider" << ""<< endl;
+    // cout << "预处理线程------------------DataProvider" << ""<< endl;
     threads[i] = new thread(&DataProvider<datatype>::run, data_provider_[i]);
   }
   if (!use_rtctx) {
-    cout << "推理线程------------------inference" << ""<< endl;
+    // cout << "推理线程------------------inference" << ""<< endl;
     threads[FLAGS_data_provider_num] = new thread(&Inferencer::run, inferencer_);
   } else {
-    LOG(INFO) << "use runtime context";
+    // LOG(INFO) << "use runtime context";
     threads[FLAGS_data_provider_num] = new thread(&Inferencer::run_with_rtctx, inferencer_);
   }
   for (int i = 0; i < FLAGS_post_processor_num; i++) {
-    cout << "后处理线程------------------PostProcessor" << ""<< endl;
+    // cout << "后处理线程------------------PostProcessor" << ""<< endl;
     threads[FLAGS_data_provider_num + 1 + i] = new thread(&PostProcessor::run, post_processor_[i]);
   }
   for (auto th : threads)
@@ -1409,7 +1475,7 @@ void Process(vector<queue<string>> img_list) {
   cnrtModel_t model;
   LOG(INFO) << "load file: " << FLAGS_offlinemodel.c_str();
   CNRT_CHECK(cnrtLoadModel(&model, FLAGS_offlinemodel.c_str()));
-  int count = 0;
+  // int count = 0;
   for (int i = 0; i < FLAGS_threads; i++) {
     if (img_list[i * FLAGS_data_provider_num].size()) {
       Pipeline<datatype>* pipeline = new Pipeline<datatype>(FLAGS_mean_file,
@@ -1421,13 +1487,13 @@ void Process(vector<queue<string>> img_list) {
           FLAGS_scale);
       pipeline_instances.push_back(pipeline);
       pipelines.push_back(new thread(&Pipeline<datatype>::run, pipeline));
-      count++;
+      // count++;
     }
   }
-  cout << count<<"count" << endl;
-  cout << img_list.size() << " img_list.size()--------------------------" << endl; 
-  cout << pipeline_instances.size() << "pipeline_instances.size()--------------------------" << endl; 
-  cout << pipelines.size() << "pipelines.size()--------------------------" << endl; 
+  // cout << count<<"count" << endl;
+  // cout << img_list.size() << " img_list.size()--------------------------" << endl; 
+  // cout << pipeline_instances.size() << "pipeline_instances.size()--------------------------" << endl; 
+  // cout << pipelines.size() << "pipelines.size()--------------------------" << endl; 
 
   double time_use;
   struct timeval tpend, tpstart;
@@ -1514,7 +1580,7 @@ int main(int argc, char* argv[]) {
   gflags::ParseCommandLineFlags(&argc, &argv, true);
 
   std::ifstream files_tmp(FLAGS_images.c_str(), std::ios::in);
-  cout << FLAGS_images.c_str() << "++++++++++++++++++++++++++++++++flags.images" << endl;
+  // cout << FLAGS_images.c_str() << "++++++++++++++++++++++++++++++++flags.images" << endl;
   int image_num = 0;
   vector<string> files;
   std::string line_tmp;
@@ -1532,10 +1598,10 @@ int main(int argc, char* argv[]) {
       }
     }
   }
-  for (int i = 0;i<img_list.size();i++){
-    cout << img_list[i].size() << "img_list_queue----------=============" << endl;
-  }
-  cout << img_list.size() << "--------------------------imglist" << endl; 
+  // for (int i = 0;i<img_list.size();i++){
+  //   cout << img_list[i].size() << "img_list_queue----------=============" << endl;
+  // }
+  // cout << img_list.size() << "--------------------------imglist" << endl; 
   files_tmp.close();
   result_num = image_num;
   check_args();
@@ -1544,7 +1610,7 @@ int main(int argc, char* argv[]) {
 
   VideoCapture capture;
   
-  frame= capture.open("/home/Cambricon-Test/nanbei.mp4");
+  frame= capture.open("/home/chuangxin/Disk/v8.1.1/Cambricon-MLU100_1/nanbei.mp4");
   if(!capture.isOpened())
   {
       printf("can not open ...\n");
@@ -1554,27 +1620,100 @@ int main(int argc, char* argv[]) {
   vector<cv::Mat> imgs;
   vector<string> img_names;
   int filename_count = 0;
+  // clock_t begin;
+  // clock_t end;
+    //绘制线要确定的点
+  cv::Point line_1(0,600);
+  cv::Point line_2(1920,600);
+  // int i = 600;
+  vector<Point> p_vec;
+  Point person_g,person_rb;
+  uchar *data = 0;
+  // int myFourCC = VideoWriter::fourcc('m', 'p', '4', 'v');//mp4 保存视频的编码
+  VideoWriter writer("output.avi",CV_FOURCC('M','J','P','G'), 25.0, Size(capture.get(3),capture.get(4)));
+  int person_num = 0;
+
+  // uchar *rbgline = 0 ;
+  int k,l;
   while (capture.read(frame))
   {
+    // begin = clock();
+    dst = frame.clone();
     // resize(frame,frame,Size(800,1000));
-    img_names.push_back(to_string(filename_count));
-    v_names.push_back(img_names);
-    filename_count++;
-    if (FLAGS_int8) {
+    if (!frame.empty()){
+      // 画计数线
+      cv::line(frame,line_1,line_2,cv::Scalar(200,0,0),1);
+      // cv::line(dst,line_1,line_2,cv::Scalar(200,0,0),1);
+
+      img_names.push_back(to_string(filename_count));
+      v_names.push_back(img_names);
+      filename_count++;
+      if (FLAGS_int8) {
+        imgs.push_back(frame);
+        v_images.push_back(imgs);
+        Process<uint8_t>(img_list);
+      } else {
+        imgs.push_back(frame);
+        v_images.push_back(imgs);
+        Process<float>(img_list);
+      }
+      // cout << p_vec.size() << "个人头中心点" << endl;
+      //遍历人头中心，查看下一帧的像素是否变化
+      for(int m = 0;m < p_vec.size();m++){
+
+        person_rb = p_vec[m];
+        data = writer_img.ptr<uchar>(person_rb.y);
+        if (data[3 * person_rb.x + 0] == 255 && data[3 * person_rb.x + 1] == 0 && data[3 * person_rb.x + 2] == 0){
+          // putText(writer_img,to_string(person_num),Point(200,60),FONT_HERSHEY_SIMPLEX,1,Scalar(255,0,0),4,8);
+          // data[3 * person_rb.y + 0] == 255;
+          // data[3 * person_rb.y + 1] == 255;
+          // data[3 * person_rb.y + 2] == 255;
+          person_num--;
+        }else if (data[3 * person_rb.x + 0] == 0 && data[3 * person_rb.x + 1] == 0 && data[3 * person_rb.x + 2] == 255){
+          person_num++;
+          // data[3 * person_rb.y + 0] == 255;
+          // data[3 * person_rb.y + 1] == 255;
+          // data[3 * person_rb.y + 2] == 255;
+        }
+      }
+      p_vec.clear();
+      for(int j = 0;j < 1920;j++){
+        data = writer_img.ptr<uchar>(600);
+        if (data[3 * j + 0] == 0 && data[3 * j + 1] == 255 && data[3 * j + 2] == 0){
+          person_g.x = j;
+          person_g.y = 600;
+          p_vec.push_back(person_g);
+          // cout << "检测到人头" << endl;
+          // exit(0);
+        }
+      }
       
-      imgs.push_back(frame);
-      v_images.push_back(imgs);
-      Process<uint8_t>(img_list);
-    } else {
-      imgs.push_back(frame);
-      v_images.push_back(imgs);
-      Process<float>(img_list);
-    
+      for (k = 1570;k<1620;k++){
+          for(l = 0;l < 40;l++){
+              data = dst.ptr<uchar>(l);
+              data[3*k] = 255;
+              data[3*k + 1] = 255;
+              data[3*k + 2] = 255;
+          }
+      }
+      putText(dst,to_string(person_num),Point(1580,30),FONT_HERSHEY_SIMPLEX,1,Scalar(255,0,0),4,8);
+
+      putText(writer_img,to_string(person_num),Point(1580,30),FONT_HERSHEY_SIMPLEX,1,Scalar(255,0,0),4,8);
+      // cv::imshow("result",dst);
+
+      writer << dst;
+
+
+      imgs.clear();
+      v_images.clear();
+      img_names.clear();
+      v_names.clear();
+    }else{
+      break;
     }
-    imgs.clear();
-    v_images.clear();
-    img_names.clear();
-    v_names.clear();
+
+    // end = clock();
+    // cout << "Runnig time:" << (double)(end - begin) / CLOCKS_PER_SEC * 1000 << "MS" << endl;
     waitKey(10);
   }
 
